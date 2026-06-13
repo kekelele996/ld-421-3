@@ -27,10 +27,13 @@ export const reservationService = {
         conflicts.push({ type: "borrow", id: b.id, startsAt: b.borrowedAt, endsAt: b.expectedReturnAt, label: `借用: ${b.purpose} (${b.borrowedAt} ~ ${b.expectedReturnAt})` });
       }
     }
-    const ongoingMaintenance = maintenanceRecords.filter((m) => m.equipmentId === equipmentId);
-    for (const m of ongoingMaintenance) {
-      if (intervalsOverlap(startsAt, endsAt, m.maintenanceDate, m.nextMaintenanceDate)) {
-        conflicts.push({ type: "maintenance", id: m.id, startsAt: m.maintenanceDate, endsAt: m.nextMaintenanceDate, label: `维保: ${m.content} (${m.maintenanceDate} ~ ${m.nextMaintenanceDate})` });
+    const activeMaintenance = maintenanceRecords.filter((m) => m.equipmentId === equipmentId && m.result === "NeedsFollowUp");
+    for (const m of activeMaintenance) {
+      const maintenanceEnd = new Date(m.maintenanceDate);
+      maintenanceEnd.setDate(maintenanceEnd.getDate() + 14);
+      const maintenanceEndStr = maintenanceEnd.toISOString().slice(0, 10);
+      if (intervalsOverlap(startsAt, endsAt, m.maintenanceDate, maintenanceEndStr)) {
+        conflicts.push({ type: "maintenance", id: m.id, startsAt: m.maintenanceDate, endsAt: maintenanceEndStr, label: `维保中: ${m.content} (${m.maintenanceDate} 起，待后续处理)` });
       }
     }
     const activeReservations = reservations.filter(

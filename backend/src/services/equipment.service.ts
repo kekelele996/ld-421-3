@@ -33,9 +33,11 @@ export const equipmentService = {
     for (const b of activeBorrows) {
       events.push({ type: "borrow", id: b.id, startsAt: b.borrowedAt, endsAt: b.expectedReturnAt, title: b.purpose, status: b.status });
     }
-    const maintenanceList = maintenanceRecords.filter((m) => m.equipmentId === id);
-    for (const m of maintenanceList) {
-      events.push({ type: "maintenance", id: m.id, startsAt: m.maintenanceDate, endsAt: m.nextMaintenanceDate, title: m.content, status: m.result });
+    const activeMaintenance = maintenanceRecords.filter((m) => m.equipmentId === id && m.result === "NeedsFollowUp");
+    for (const m of activeMaintenance) {
+      const maintenanceEnd = new Date(m.maintenanceDate);
+      maintenanceEnd.setDate(maintenanceEnd.getDate() + 14);
+      events.push({ type: "maintenance", id: m.id, startsAt: m.maintenanceDate, endsAt: maintenanceEnd.toISOString().slice(0, 10), title: m.content, status: m.result });
     }
     const activeReservations = reservations.filter((r) => r.equipmentId === id && (r.status === "Approved" || r.status === "Pending"));
     for (const r of activeReservations) {
