@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>实验室设备管理系统</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #18231f;
+        --muted: #66736d;
+        --line: #dfe7e2;
+        --paper: #f6f7f2;
+        --panel: #fbfcf7;
+        --green: #1f7a5c;
+        --amber: #b36a12;
+        --red: #b83b3b;
+        --blue: #2f6f9f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      header {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        min-height: 100vh;
+      }
+      nav {
+        padding: 28px 22px;
+        border-right: 1px solid var(--line);
+        background: #edf2ea;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+      }
+      h1 { margin: 0 0 28px; font-size: 28px; line-height: 1.08; letter-spacing: 0; }
+      h2 { margin: 0 0 18px; font-size: 24px; }
+      .nav-button {
+        width: 100%;
+        display: block;
+        text-align: left;
+        border: 0;
+        background: transparent;
+        color: var(--ink);
+        padding: 12px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 15px;
+      }
+      .nav-button.active, .nav-button:hover { background: #dbe8dd; }
+      main { padding: clamp(22px, 3vw, 44px); }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; }
+      input, select {
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: #fffef9;
+      }
+      button.action {
+        min-height: 38px;
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 14px;
+        color: white;
+        background: var(--green);
+        cursor: pointer;
+      }
+      button.secondary { background: var(--blue); }
+      button.warning { background: var(--amber); }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 20px; }
+      .card, table {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .card { padding: 16px; }
+      .stat { font-size: 30px; font-weight: 700; margin-top: 8px; }
+      table { width: 100%; border-collapse: collapse; overflow: hidden; }
+      th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: var(--muted); font-size: 13px; background: #eef3ef; }
+      .badge { display: inline-flex; border-radius: 999px; padding: 4px 9px; font-size: 12px; background: #e7ece8; }
+      .badge.Available, .badge.Approved, .badge.Returned, .badge.Pass { color: var(--green); background: #dceee5; }
+      .badge.Pending, .badge.Maintenance, .badge.NeedsFollowUp { color: var(--amber); background: #f6ead5; }
+      .badge.Rejected, .badge.Lost, .badge.Fail { color: var(--red); background: #f5dddd; }
+      .alert { border-left: 5px solid var(--amber); background: #fff6df; padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; }
+      @media (max-width: 760px) {
+        header { grid-template-columns: 1fr; }
+        nav { height: auto; position: static; border-right: 0; border-bottom: 1px solid var(--line); }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <h1>实验室设备<br />管理系统</h1>
+        <button class="nav-button active" data-view="dashboard">设备总览</button>
+        <button class="nav-button" data-view="equipment">设备管理</button>
+        <button class="nav-button" data-view="borrow">借用管理</button>
+        <button class="nav-button" data-view="reservations">预约管理</button>
+        <button class="nav-button" data-view="maintenance">维护管理</button>
+      </nav>
+      <main id="app">加载中...</main>
+    </header>
+    <script>
+      const api = async (path, options = {}) => {
+        const response = await fetch(`/api${path}`, {
+          ...options,
+          headers: { "content-type": "application/json", "x-demo-role": "LabManager", ...(options.headers || {}) }
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || "请求失败");
+        return payload.data;
+      };
+      const badge = (value) => `<span class="badge ${value}">${value}</span>`;
+      const currency = (value) => new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 0 }).format(value);
+      let state = { view: "dashboard", equipment: [], categories: [], borrow: [], reservations: [], maintenance: null, dashboard: null };
+
+      async function loadBase() {
+        const [equipment, categories] = await Promise.all([api("/equipment"), api("/categories")]);
+        state.equipment = equipment;
+        state.categories = categories;
+      }
+      async function show(view) {
+        state.view = view;
+        document.querySelectorAll(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+        if (!state.equipment.length) await loadBase();
+        if (view === "dashboard") state.dashboard = await api("/dashboard");
+        if (view === "borrow") state.borrow = await api("/borrow");
+        if (view === "reservations") state.reservations = await api("/reservations");
+        if (view === "maintenance") state.maintenance = await api("/maintenance");
+        render();
+      }
+      function equipmentName(id) {
+        return state.equipment.find((item) => item.id === id)?.name || id;
+      }
+      function render() {
+        const app = document.getElementById("app");
+        if (state.view === "dashboard") {
+          const d = state.dashboard;
+          app.innerHTML = `<h2>设备总览仪表盘</h2>
+            <div class="alert">待审批借用 ${d.stats.pendingBorrow} 条，待审批预约 ${d.stats.pendingReservation} 条，30天内维护 ${d.stats.maintenanceDue} 项。</div>
+            <section class="grid">
+              <div class="card">设备总数<div class="stat">${d.stats.totalEquipment}</div></div>
+              <div class="card">待审批借用<div class="stat">${d.stats.pendingBorrow}</div></div>
+              <div class="card">待审批预约<div class="stat">${d.stats.pendingReservation}</div></div>
+              <div class="card">状态分布<div>${Object.entries(d.byStatus).map(([k,v]) => `${badge(k)} ${v}`).join("<br />")}</div></div>
+            </section>
+            <h2>本月借用 TOP10</h2>${table(["设备", "次数"], d.borrowTop.map((x) => [x.equipmentName, x.count]))}
+            <h2>即将过保设备</h2>${table(["设备", "保修到期"], d.warrantyAlerts.map((x) => [x.name, x.warrantyExpiresAt]))}`;
+        }
+        if (state.view === "equipment") {
+          app.innerHTML = `<h2>设备管理</h2><div class="toolbar"><input id="q" placeholder="搜索设备/编号/位置" /><button class="action" onclick="createEquipment()">登记入库</button></div>
+          ${table(["设备", "分类", "状态", "位置", "价格"], state.equipment.map((x) => [x.name + "<br><small>" + x.equipmentNo + "</small>", x.categoryId, badge(x.status), x.location, currency(x.purchasePrice)]))}`;
+          document.getElementById("q").oninput = async (event) => {
+            state.equipment = await api(`/equipment?search=${encodeURIComponent(event.target.value)}`);
+            render();
+          };
+        }
+        if (state.view === "borrow") {
+          app.innerHTML = `<h2>借用管理</h2><div class="toolbar"><button class="action" onclick="createBorrow()">提交借用</button></div>
+          ${table(["流程", "设备", "事由", "状态", "操作"], state.borrow.map((x) => ["申请 → 审批 → 使用 → 归还", equipmentName(x.equipmentId), x.purpose, badge(x.status), `<button class="action secondary" onclick="approveBorrow('${x.id}')">审批</button> <button class="action warning" onclick="returnBorrow('${x.id}')">归还</button>`]))}`;
+        }
+        if (state.view === "reservations") {
+          app.innerHTML = `<h2>预约管理</h2><div class="toolbar"><button class="action" onclick="createReservation()">创建预约</button></div>
+          ${table(["设备", "时间段", "用途", "状态", "操作"], state.reservations.map((x) => [equipmentName(x.equipmentId), `${x.startsAt}<br>${x.endsAt}`, x.purpose, badge(x.status), `<button class="action secondary" onclick="approveReservation('${x.id}')">审批</button> <button class="action warning" onclick="cancelReservation('${x.id}')">取消</button>`]))}`;
+        }
+        if (state.view === "maintenance") {
+          const m = state.maintenance;
+          app.innerHTML = `<h2>维护管理</h2><section class="grid"><div class="card">维护费用<div class="stat">${currency(m.stats.totalCost)}</div></div><div class="card">即将到期<div class="stat">${m.stats.upcoming.length}</div></div></section>
+          <div class="toolbar"><button class="action" onclick="createMaintenance()">执行维护</button></div>
+          ${table(["设备", "类型", "内容", "下次维护", "费用", "结果"], m.records.map((x) => [equipmentName(x.equipmentId), x.type, x.content, x.nextMaintenanceDate, currency(x.cost), badge(x.result)]))}`;
+        }
+      }
+      function table(headers, rows) {
+        return `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      }
+      async function createEquipment() {
+        await api("/equipment", { method: "POST", body: JSON.stringify({ name: "新登记离心机", equipmentNo: "LAB-CEN-2026-021", purchasePrice: 58000, location: "理科楼-B218" }) });
+        state.equipment = await api("/equipment");
+        render();
+      }
+      async function createBorrow() {
+        await api("/borrow", { method: "POST", body: JSON.stringify({ equipmentId: state.equipment[1].id, purpose: "蛋白样品检测" }) });
+        state.borrow = await api("/borrow");
+        render();
+      }
+      async function approveBorrow(id) { await api(`/borrow/${id}/approve`, { method: "PATCH", body: JSON.stringify({ approved: true }) }); state.borrow = await api("/borrow"); render(); }
+      async function returnBorrow(id) { await api(`/borrow/${id}/return`, { method: "PATCH", body: JSON.stringify({ condition: "Good" }) }); state.borrow = await api("/borrow"); state.equipment = await api("/equipment"); render(); }
+      async function createReservation() { await api("/reservations", { method: "POST", body: JSON.stringify({ equipmentId: state.equipment[0].id, startsAt: "2026-06-15T09:00:00+08:00", endsAt: "2026-06-15T11:00:00+08:00", purpose: "方法学验证" }) }); state.reservations = await api("/reservations"); render(); }
+      async function approveReservation(id) { await api(`/reservations/${id}/approve`, { method: "PATCH", body: JSON.stringify({ approved: true }) }); state.reservations = await api("/reservations"); render(); }
+      async function cancelReservation(id) { await api(`/reservations/${id}/cancel`, { method: "PATCH" }); state.reservations = await api("/reservations"); render(); }
+      async function createMaintenance() { await api("/maintenance", { method: "POST", body: JSON.stringify({ equipmentId: state.equipment[0].id, type: "Cleaning", content: "流路清洗与光源检查", cost: 800, result: "Pass" }) }); state.maintenance = await api("/maintenance"); render(); }
+      document.querySelectorAll(".nav-button").forEach((button) => button.onclick = () => show(button.dataset.view));
+      show("dashboard").catch((error) => document.getElementById("app").textContent = error.message);
+    </script>
+  </body>
+</html>

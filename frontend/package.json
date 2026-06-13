@@ -1,0 +1,21 @@
+{
+  "name": "lab-equipment-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "build": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "antd": "^5.22.5",
+    "echarts": "^5.5.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^6.0.3",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

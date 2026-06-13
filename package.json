@@ -1,0 +1,8 @@
+{
+  "name": "lab-equipment",
+  "private": true,
+  "scripts": {
+    "check": "npm --prefix backend run check && npm --prefix frontend run check",
+    "start:backend": "npm --prefix backend start"
+  }
+}
