@@ -1,5 +1,5 @@
-import { reservations, borrowRecords, maintenanceRecords } from "../database/seeds/seed.ts";
-import { BorrowStatus } from "../types/enums.ts";
+import { reservations, borrowRecords, maintenanceRecords, equipment } from "../database/seeds/seed.ts";
+import { AssetStatus, BorrowStatus } from "../types/enums.ts";
 import type { Reservation } from "../types/interfaces.ts";
 import { ApiError } from "../utils/response.ts";
 
@@ -19,21 +19,25 @@ export const reservationService = {
   },
   checkConflicts(equipmentId: string, startsAt: string, endsAt: string): ConflictItem[] {
     const conflicts: ConflictItem[] = [];
+    const eq = equipment.find((e) => e.id === equipmentId);
+    if (eq && eq.status === AssetStatus.Maintenance) {
+      const ongoing = maintenanceRecords.filter((m) => m.equipmentId === equipmentId && m.result === "NeedsFollowUp");
+      const m = ongoing[0];
+      conflicts.push({
+        type: "maintenance",
+        id: m?.id ?? equipmentId,
+        startsAt: m?.maintenanceDate ?? "",
+        endsAt: "",
+        label: `设备维保中: ${m?.content ?? "待维修"}，暂不可预约，需等维保解除`
+      });
+      return conflicts;
+    }
     const activeBorrows = borrowRecords.filter(
       (b) => b.equipmentId === equipmentId && (b.status === BorrowStatus.Approved || b.status === BorrowStatus.Pending)
     );
     for (const b of activeBorrows) {
       if (intervalsOverlap(startsAt, endsAt, b.borrowedAt, b.expectedReturnAt)) {
         conflicts.push({ type: "borrow", id: b.id, startsAt: b.borrowedAt, endsAt: b.expectedReturnAt, label: `借用: ${b.purpose} (${b.borrowedAt} ~ ${b.expectedReturnAt})` });
-      }
-    }
-    const activeMaintenance = maintenanceRecords.filter((m) => m.equipmentId === equipmentId && m.result === "NeedsFollowUp");
-    for (const m of activeMaintenance) {
-      const maintenanceEnd = new Date(m.maintenanceDate);
-      maintenanceEnd.setDate(maintenanceEnd.getDate() + 14);
-      const maintenanceEndStr = maintenanceEnd.toISOString().slice(0, 10);
-      if (intervalsOverlap(startsAt, endsAt, m.maintenanceDate, maintenanceEndStr)) {
-        conflicts.push({ type: "maintenance", id: m.id, startsAt: m.maintenanceDate, endsAt: maintenanceEndStr, label: `维保中: ${m.content} (${m.maintenanceDate} 起，待后续处理)` });
       }
     }
     const activeReservations = reservations.filter(

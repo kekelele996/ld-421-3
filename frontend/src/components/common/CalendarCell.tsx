@@ -21,8 +21,10 @@ export function TimelineEventCell({ event }: { event: TimelineEvent }) {
   const color = typeColorMap[event.type];
   const label = typeLabelMap[event.type];
   const startsAt = new Date(event.startsAt);
-  const endsAt = new Date(event.endsAt);
-  const dateStr = `${startsAt.toLocaleDateString("zh-CN")} ${startsAt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })} - ${endsAt.toLocaleDateString("zh-CN")} ${endsAt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
+  const startStr = `${startsAt.toLocaleDateString("zh-CN")} ${startsAt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
+  const dateStr = event.endsAt
+    ? `${startStr} - ${new Date(event.endsAt).toLocaleDateString("zh-CN")} ${new Date(event.endsAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
+    : `${startStr} 起，维保进行中`;
   return (
     <div style={{ padding: "4px 0" }}>
       <Tag color={color} style={{ marginRight: 4 }}>{label}</Tag>
