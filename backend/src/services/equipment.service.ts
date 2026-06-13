@@ -1,7 +1,9 @@
 import { equipment, categories, borrowRecords, maintenanceRecords, reservations } from "../database/seeds/seed.ts";
-import { AssetStatus } from "../types/enums.ts";
+import { AssetStatus, BorrowStatus } from "../types/enums.ts";
 import type { Equipment } from "../types/interfaces.ts";
 import { ApiError } from "../utils/response.ts";
+
+type TimelineEvent = { type: "borrow" | "maintenance" | "reservation"; id: string; startsAt: string; endsAt: string; title: string; status?: string };
 
 export const equipmentService = {
   list(search = "", categoryId = "") {
@@ -22,6 +24,24 @@ export const equipmentService = {
       maintenanceHistory: maintenanceRecords.filter((record) => record.equipmentId === id),
       reservationCalendar: reservations.filter((record) => record.equipmentId === id)
     };
+  },
+  timeline(id: string): TimelineEvent[] {
+    const item = equipment.find((entry) => entry.id === id);
+    if (!item) throw new ApiError(404, "EQUIPMENT_NOT_FOUND", "设备不存在");
+    const events: TimelineEvent[] = [];
+    const activeBorrows = borrowRecords.filter((b) => b.equipmentId === id && (b.status === BorrowStatus.Approved || b.status === BorrowStatus.Pending));
+    for (const b of activeBorrows) {
+      events.push({ type: "borrow", id: b.id, startsAt: b.borrowedAt, endsAt: b.expectedReturnAt, title: b.purpose, status: b.status });
+    }
+    const maintenanceList = maintenanceRecords.filter((m) => m.equipmentId === id);
+    for (const m of maintenanceList) {
+      events.push({ type: "maintenance", id: m.id, startsAt: m.maintenanceDate, endsAt: m.nextMaintenanceDate, title: m.content, status: m.result });
+    }
+    const activeReservations = reservations.filter((r) => r.equipmentId === id && (r.status === "Approved" || r.status === "Pending"));
+    for (const r of activeReservations) {
+      events.push({ type: "reservation", id: r.id, startsAt: r.startsAt, endsAt: r.endsAt, title: r.purpose, status: r.status });
+    }
+    return events.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   },
   create(input: Partial<Equipment>) {
     const item: Equipment = {

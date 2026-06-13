@@ -10,6 +10,9 @@ export const equipmentController = {
   detail(id: string) {
     return equipmentService.detail(id);
   },
+  timeline(id: string) {
+    return equipmentService.timeline(id);
+  },
   create(user: User, body: Record<string, unknown>) {
     rbacMiddleware(user, ["Admin", "LabManager"]);
     const item = equipmentService.create(body);

@@ -7,6 +7,13 @@ export const reservationController = {
   list(query: URLSearchParams) {
     return reservationService.list(query.get("equipmentId") ?? "");
   },
+  checkConflicts(query: URLSearchParams) {
+    const equipmentId = query.get("equipmentId") ?? "";
+    const startsAt = query.get("startsAt") ?? "";
+    const endsAt = query.get("endsAt") ?? "";
+    if (!equipmentId || !startsAt || !endsAt) return { conflicts: [] };
+    return { conflicts: reservationService.checkConflicts(equipmentId, startsAt, endsAt) };
+  },
   create(user: User, body: Record<string, unknown>) {
     const record = reservationService.create(body);
     auditLogMiddleware(user, "CREATE_RESERVATION", "Reservation", record.id);
